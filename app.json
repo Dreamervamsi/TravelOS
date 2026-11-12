@@ -8,7 +8,7 @@
     "ios": { "supportsTablet": true },
     "android": { "adaptiveIcon": { "backgroundColor": "#F7F7FA" } },
     "plugins": [
-      ["expo-av", { "microphonePermission": "TravelOS uses your microphone to listen to your travel question." }]
+      ["expo-audio", { "microphonePermission": "TravelOS uses your microphone to listen to your travel question." }]
     ]
   }
 }
