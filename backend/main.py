@@ -1,39 +1,37 @@
-import os
-from pathlib import Path
-
 import requests
-from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv(Path(__file__).with_name(".env"))
+from pathlib import Path
+from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from config import get_settings
+
+settings = get_settings()
+
+GROQ_API_KEY = settings.groq_api_key
+GROQ_MODEL = settings.groq_model
+ELEVENLABS_API_KEY = settings.elevenlabs_api_key
+ELEVENLABS_MODEL_ID = settings.elevenlabs_model_id
 
 app = FastAPI(title="TravelOS Voice API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict to your app origins before production.
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-ELEVENLABS_MODEL_ID = os.getenv("ELEVENLABS_MODEL_ID", "scribe_v2")
-
-
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "service": "TravelOS Voice API"}
-
 
 @app.get("/api/transcribe")
 def transcribe_info():
     return {"method": "POST", "path": "/api/transcribe", "field": "file"}
 
-
 @app.post("/api/transcribe")
 async def transcribe(file: UploadFile = File(...)):
-    if not ELEVENLABS_API_KEY or ELEVENLABS_API_KEY == "paste_your_elevenlabs_api_key_here":
+    if not ELEVENLABS_API_KEY:
         raise HTTPException(status_code=503, detail="Set ELEVENLABS_API_KEY in backend/.env first.")
 
     audio = await file.read()
@@ -55,4 +53,17 @@ async def transcribe(file: UploadFile = File(...)):
         raise HTTPException(status_code=502, detail=f"ElevenLabs transcription failed: {detail}") from exc
 
     print(f"User said: {transcript}", flush=True)
+    groq_client = AsyncGroq(api_key=GROQ_API_KEY)
+
+    try:
+        await groq_client.chat.completions(
+            model = GROQ_MODEL,
+             messages=[
+                {"role": "system", "content": "You are a helpful and concise AI assistant."},
+                {"role": "user", "content": transcript}
+            ],
+            temperature=payload.temperature,
+            max_tokens=1024,
+        )
+
     return {"ok": True}
