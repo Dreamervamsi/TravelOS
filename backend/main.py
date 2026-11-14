@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
+from nlp.api import extract_travel_blueprint
 
 settings = get_settings()
 
@@ -48,22 +49,15 @@ async def transcribe(file: UploadFile = File(...)):
         )
         response.raise_for_status()
         transcript = response.json().get("text", "")
-    except requests.RequestException as exc:
+
+        # Spacy NLP
+        nlp_response = extract_travel_blueprint(transcript)
+        print(nlp_response)
+
+    except (requests.RequestException, Exception) as exc:
         detail = exc.response.text if exc.response is not None else str(exc)
         raise HTTPException(status_code=502, detail=f"ElevenLabs transcription failed: {detail}") from exc
 
     print(f"User said: {transcript}", flush=True)
-    groq_client = AsyncGroq(api_key=GROQ_API_KEY)
-
-    try:
-        await groq_client.chat.completions(
-            model = GROQ_MODEL,
-             messages=[
-                {"role": "system", "content": "You are a helpful and concise AI assistant."},
-                {"role": "user", "content": transcript}
-            ],
-            temperature=payload.temperature,
-            max_tokens=1024,
-        )
 
     return {"ok": True}
